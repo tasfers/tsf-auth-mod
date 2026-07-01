@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "package": "com.tasfers.tsfauth.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+  ],
+  "client": [
+    "MultiplayerScreenMixin",
+    "MinecraftClientAccessor",
+    "UserAccessor",
+    "ServerInfoMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
