@@ -1,4 +1,4 @@
-# ✨ TSF Auth Client Mod
+# tsf auth mod
 
 [![Minecraft Version](https://img.shields.io/badge/Minecraft-1.21.11-blue?logo=minecraft&style=for-the-badge)](https://fabricmc.net/)
 [![Platform](https://img.shields.io/badge/Platform-Fabric-orange?style=for-the-badge)](https://fabricmc.net/)
@@ -18,12 +18,9 @@
 ### 🛡️ Фоновый авторефрешер (`TokenRefresher`)
 * **Автоматическое продление сессии**: Запускает периодическую фоновую задачу для валидации авторизационных токенов. Токены автоматически валидируются на сервере авторизации в фоновом режиме, тем самым продлевая срок их действия и предотвращая вылеты из сессий во время долгого отсутствия активности.
 
-### 👕 Предварительная загрузка скинов (`SkinFetcher`)
-* **Оптимизация**: Асинхронно скачивает и кэширует скины для всех добавленных в менеджер аккаунтов во время запуска игры.
-
 ---
 
 ## ⚙️ Системные требования
 * **Minecraft**: Версия `1.21.11` (совместимо с Fabric API).
-* **Fabric Loader**: Версия `0.19.2` или выше.
-* **Java**: **JDK 21** или выше.
+* **Fabric Loader**: Версия `0.19.2` or higher.
+* **Java**: **JDK 21** or higher.
