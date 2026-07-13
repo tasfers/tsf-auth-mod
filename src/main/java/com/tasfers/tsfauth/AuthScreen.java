@@ -80,7 +80,7 @@ public class AuthScreen extends Screen {
     }
 
     private void performLogin() {
-        String hostname = com.tasfers.tsfauth.BuildConstants.getH();
+        String hostname = com.tasfers.tsfauth.TsfAuthPreLaunch.getAuthHost();
         String username = this.usernameField.getValue();
         String password = this.passwordField.getValue();
 
