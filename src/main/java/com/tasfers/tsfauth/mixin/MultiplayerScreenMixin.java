@@ -23,10 +23,26 @@ public class MultiplayerScreenMixin extends Screen {
 
     @Inject(method = "init", at = @At("RETURN"))
     private void onInit(CallbackInfo ci) {
-        this.authButton = Button.builder(Component.literal(""), button -> {
+        int btnX = this.width / 2 - 154 - 24;
+        int btnY = this.height - 52;
+        int btnW = 20;
+        int btnH = 44; // Span both rows
+        
+        // Try to find the vanilla "Join Server" button dynamically to align next to it
+        for (net.minecraft.client.gui.components.events.GuiEventListener child : this.children()) {
+            if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
+                if (widget.getWidth() == 152 && widget.getY() == this.height - 52) {
+                    btnX = widget.getX() - 24;
+                    btnY = widget.getY();
+                    break;
+                }
+            }
+        }
+
+        this.authButton = Button.builder(Component.literal("👤"), button -> {
             this.minecraft.setScreen(new com.tasfers.tsfauth.AccountListScreen(this));
         })
-        .bounds(this.width / 2 - 202, this.height - 52, 44, 44)
+        .bounds(btnX, btnY, btnW, btnH)
         .build();
         this.addRenderableWidget(this.authButton);
         
@@ -41,21 +57,6 @@ public class MultiplayerScreenMixin extends Screen {
         this.addRenderableOnly((context, mouseX, mouseY, delta) -> {
             context.drawCenteredString(this.font, "tsf account: " + TsfAuthClient.currentStatus, this.width / 2, 4, 0xFFFFFFFF);
             context.drawCenteredString(this.font, this.title, this.width / 2, 19, 0xFFFFFFFF);
-            
-            if (this.authButton != null) {
-                int btnX = this.authButton.getX();
-                int btnY = this.authButton.getY();
-                int btnW = this.authButton.getWidth();
-                int btnH = this.authButton.getHeight();
-                int color = this.authButton.active ? 0xFFFFFFFF : 0xFFA0A0A0;
-                
-                int gap = 3;
-                int textHeight = this.font.lineHeight * 2 + gap;
-                int startY = btnY + (btnH - textHeight) / 2;
-                
-                context.drawCenteredString(this.font, "tsf", btnX + btnW / 2, startY, color);
-                context.drawCenteredString(this.font, "auth", btnX + btnW / 2, startY + this.font.lineHeight + gap, color);
-            }
         });
     }
 }
