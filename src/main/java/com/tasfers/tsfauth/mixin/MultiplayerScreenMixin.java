@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -18,11 +19,11 @@ public class MultiplayerScreenMixin extends Screen {
         super(title);
     }
 
-    @org.spongepowered.asm.mixin.Unique
+    @Unique
     private Button authButton;
 
-    @Inject(method = "init", at = @At("RETURN"))
-    private void onInit(CallbackInfo ci) {
+    @Inject(method = "repositionElements", at = @At("RETURN"))
+    private void onReposition(CallbackInfo ci) {
         int btnX = this.width / 2 - 154 - 24;
         int btnY = this.height - 52;
         int btnW = 20;
@@ -31,6 +32,7 @@ public class MultiplayerScreenMixin extends Screen {
         // Try to find the vanilla "Join Server" button dynamically to align next to it
         for (net.minecraft.client.gui.components.events.GuiEventListener child : this.children()) {
             if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
+                if (widget == this.authButton) continue;
                 if (widget.getWidth() == 152 && widget.getY() == this.height - 52) {
                     btnX = widget.getX() - 24;
                     btnY = widget.getY();
@@ -39,12 +41,20 @@ public class MultiplayerScreenMixin extends Screen {
             }
         }
 
-        this.authButton = Button.builder(Component.literal("👤"), button -> {
-            this.minecraft.setScreen(new com.tasfers.tsfauth.AccountListScreen(this));
-        })
-        .bounds(btnX, btnY, btnW, btnH)
-        .build();
-        this.addRenderableWidget(this.authButton);
+        if (this.authButton != null) {
+            this.authButton.setX(btnX);
+            this.authButton.setY(btnY);
+            if (!this.children().contains(this.authButton)) {
+                this.addRenderableWidget(this.authButton);
+            }
+        } else {
+            this.authButton = Button.builder(Component.literal("👤"), button -> {
+                this.minecraft.setScreen(new com.tasfers.tsfauth.AccountListScreen(this));
+            })
+            .bounds(btnX, btnY, btnW, btnH)
+            .build();
+            this.addRenderableWidget(this.authButton);
+        }
         
         // Hide original title widget to stop it from jumping on resize
         for (net.minecraft.client.gui.components.events.GuiEventListener child : this.children()) {
@@ -54,6 +64,7 @@ public class MultiplayerScreenMixin extends Screen {
                 }
             }
         }
+
         this.addRenderableOnly((context, mouseX, mouseY, delta) -> {
             context.drawCenteredString(this.font, "tsf account: " + TsfAuthClient.currentStatus, this.width / 2, 4, 0xFFFFFFFF);
             context.drawCenteredString(this.font, this.title, this.width / 2, 19, 0xFFFFFFFF);
