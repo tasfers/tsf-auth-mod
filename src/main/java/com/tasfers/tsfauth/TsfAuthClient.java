@@ -33,72 +33,7 @@ public class TsfAuthClient implements ClientModInitializer {
         // Start background token refresher
         TokenRefresher.start();
 
-        // Register custom payloads
-        ClientLoginNetworking.registerGlobalReceiver(Identifier.fromNamespaceAndPath("tsfauth", "session_sync"), (client, handler, buf, listenerAdder) -> {
-            return CompletableFuture.supplyAsync(() -> {
-                try {
-                    com.google.gson.JsonArray mods = new com.google.gson.JsonArray();
-                    for (net.fabricmc.loader.api.ModContainer mod : net.fabricmc.loader.api.FabricLoader.getInstance().getAllMods()) {
-                        if (!mod.getMetadata().getType().equals("builtin") && mod.getMetadata().getId() != null && !mod.getMetadata().getId().equals("fabricloader")) {
-                            if (mod.getContainingMod().isEmpty()) {
-                                com.google.gson.JsonObject m = new com.google.gson.JsonObject();
-                                m.addProperty("id", mod.getMetadata().getId());
-                                m.addProperty("name", mod.getMetadata().getName());
-                                m.addProperty("version", mod.getMetadata().getVersion().getFriendlyString());
-                                m.addProperty("description", mod.getMetadata().getDescription());
-                                
-                                java.util.Collection<net.fabricmc.loader.api.metadata.Person> authors = mod.getMetadata().getAuthors();
-                                if (!authors.isEmpty()) {
-                                    StringBuilder authorStr = new StringBuilder();
-                                    for (net.fabricmc.loader.api.metadata.Person p : authors) {
-                                        if (authorStr.length() > 0) authorStr.append(", ");
-                                        authorStr.append(p.getName());
-                                    }
-                                    m.addProperty("authors", authorStr.toString());
-                                }
-                                
-                                java.util.Optional<String> homepage = mod.getMetadata().getContact().get("homepage");
-                                if (homepage.isPresent()) {
-                                    m.addProperty("homepage", homepage.get());
-                                }
-                                
-                                mods.add(m);
-                            }
-                        }
-                    }
 
-                    com.google.gson.JsonObject payloadJson = new com.google.gson.JsonObject();
-                    payloadJson.add("mods", mods);
-
-                    String fingerprintJson = payloadJson.toString();
-                    String modVersion = BuildConstants.getV();
-                    
-                    String modHash = "unknown";
-                    try {
-                        java.nio.file.Path modPath = net.fabricmc.loader.api.FabricLoader.getInstance().getModContainer("tsf-auth").get().getOrigin().getPaths().get(0);
-                        java.security.MessageDigest digest = java.security.MessageDigest.getInstance(BuildConstants.getS());
-                        byte[] hashBytes = digest.digest(java.nio.file.Files.readAllBytes(modPath));
-                        StringBuilder sb = new StringBuilder();
-                        for (byte b : hashBytes) {
-                            sb.append(String.format("%02x", b));
-                        }
-                        modHash = sb.toString();
-                    } catch (Exception ex) {
-                        LOGGER.error("Failed to calculate mod hash", ex);
-                    }
-                    
-                    net.minecraft.network.FriendlyByteBuf responseBuf = net.fabricmc.fabric.api.networking.v1.PacketByteBufs.create();
-                    responseBuf.writeUtf(modVersion);
-                    responseBuf.writeUtf(fingerprintJson);
-                    responseBuf.writeUtf(modHash);
-                    
-                    return responseBuf;
-                } catch (Exception e) {
-                    LOGGER.error("Failed to process and send mod list", e);
-                    return net.fabricmc.fabric.api.networking.v1.PacketByteBufs.create();
-                }
-            });
-        });
 
         try {
             java.nio.file.Path configDir = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir();
