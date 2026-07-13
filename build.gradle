@@ -1,11 +1,4 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath 'com.guardsquare:proguard-gradle:7.4.2'
-    }
-}
+// Obfuscation buildscript removed
 
 plugins {
 	id 'fabric-loom' version "${loom_version}"
@@ -124,43 +117,3 @@ sourceSets {
 
 compileJava.dependsOn generateConstants
 
-task stringObfuscator(type: com.tasfers.obfuscator.StringObfuscatorTask, dependsOn: build) {
-    inputJar = file("build/libs/tsf-auth-${project.version}.jar")
-    outputJar = file("build/libs/tsf-auth-${project.version}-stringobf.jar")
-}
-
-task proguard(type: proguard.gradle.ProGuardTask, dependsOn: stringObfuscator) {
-    injars "build/libs/tsf-auth-${project.version}-stringobf.jar"
-    outjars "build/libs/tsf-auth-${project.version}-obfuscated.jar"
-    
-    // We need the standard java libraries to resolve standard classes
-    libraryjars "${System.getProperty('java.home')}/jmods"
-    
-    // Pass compilation classpath so ProGuard doesn't strip needed interfaces
-    libraryjars sourceSets.main.compileClasspath
-    
-    configuration 'proguard-rules.pro'
-}
-
-task printHash {
-	dependsOn proguard
-	doLast {
-		def jarFile = file("build/libs/tsf-auth-${project.version}-obfuscated.jar")
-		if (jarFile.exists()) {
-			def digest = java.security.MessageDigest.getInstance("SHA-256")
-			jarFile.withInputStream { is ->
-				byte[] buffer = new byte[8192]
-				int read = 0
-				while ((read = is.read(buffer)) > 0) {
-					digest.update(buffer, 0, read)
-				}
-			}
-			def hash = digest.digest().encodeHex().toString()
-			println "\n========================================"
-			println "MOD HASH SUM (SHA-256): ${hash}"
-			println "========================================\n"
-		}
-	}
-}
-
-build.finalizedBy printHash
