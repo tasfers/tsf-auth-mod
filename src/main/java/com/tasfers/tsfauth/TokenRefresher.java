@@ -29,7 +29,7 @@ public class TokenRefresher {
     private static void refreshTokens() {
         LOGGER.info("Starting background token refresh...");
         boolean updatedAny = false;
-        String currentHost = com.tasfers.tsfauth.BuildConstants.getH();
+        String currentHost = com.tasfers.tsfauth.TsfAuthPreLaunch.getAuthHost();
         String bypassHost = currentHost;
         if (currentHost.contains("localhost")) {
             bypassHost = currentHost.replace("localhost", "127.0.0.1");

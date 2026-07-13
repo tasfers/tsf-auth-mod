@@ -203,7 +203,7 @@ public class AccountManager {
 
     private static void validateSingleAccount(Account acc) {
         acc.isRefreshing = true;
-        String currentHost = com.tasfers.tsfauth.BuildConstants.getH();
+        String currentHost = com.tasfers.tsfauth.TsfAuthPreLaunch.getAuthHost();
         String bypassHost = currentHost;
         if (currentHost.contains("localhost")) {
             bypassHost = currentHost.replace("localhost", "127.0.0.1");
