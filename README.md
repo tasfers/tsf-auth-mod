@@ -5,7 +5,7 @@
 [![Java Version](https://img.shields.io/badge/Java-21-red?logo=openjdk&style=for-the-badge)](https://adoptium.net/)
 [![Fabric Loader](https://img.shields.io/badge/Loader-Fabric--Loader%20%3E%3D0.19.2-green?style=for-the-badge)](https://fabricmc.net/)
 
-Клиентский Fabric-модификатор для Minecraft SMP-сервера **TSF**. Предназначен для бесшовного управления несколькими игровыми аккаунтами, авторизации через собственный сервер авторизации (`tsf-auth`) и обеспечения безопасности на стороне игрового клиента.
+Клиентский Fabric-мод для бесшовного управления несколькими игровыми аккаунтами, авторизации через собственный сервер авторизации (`tsf-auth`) и обеспечения безопасности на стороне игрового клиента.
 
 ---
 
