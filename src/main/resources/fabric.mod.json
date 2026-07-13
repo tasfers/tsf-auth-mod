@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "tsf-auth",
+	"version": "${version}",
+	"name": "tsf-auth",
+	"description": "tsf auth mod for multi account switching",
+	"authors": [
+		"Towux"
+	],
+	"contact": {},
+	"license": "CC0-1.0",
+	"icon": "assets/tsfauth/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.tasfers.tsfauth.TsfAuthClient"
+		],
+		"preLaunch": [
+			"com.tasfers.tsfauth.TsfAuthPreLaunch"
+		]
+	},
+	"mixins": [
+		"tsfauth.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.2",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

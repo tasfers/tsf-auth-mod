@@ -1,0 +1,41 @@
+# Gradle build files
+.gradle/
+build/
+out/
+classes/
+buildSrc/.gradle/
+buildSrc/build/
+
+# IDE configurations
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.vscode/
+bin/
+.classpath
+.project
+
+# OS specific files
+*.DS_Store
+Thumbs.db
+
+# Minecraft Client Run directories
+run/
+
+# Java and system logs
+hs_err_*.log
+replay_*.log
+*.hprof
+*.jfr
+skidfuscator.log
+
+# Generated sources
+src/main/gen/
+
+# Local/Trash directories and scripts
+trash/
+backup/
+mappings/
+Obfuscate.java

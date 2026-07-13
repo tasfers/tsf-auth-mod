@@ -1,0 +1,119 @@
+// Obfuscation buildscript removed
+
+plugins {
+	id 'fabric-loom' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+repositories {
+    maven { url "https://maven.terraformersmc.com/releases/" }
+}
+
+loom {
+	mods {
+		"modid" {
+			sourceSet sourceSets.main
+		}
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	mappings loom.officialMojangMappings()
+	
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	implementation 'net.bytebuddy:byte-buddy-agent:1.14.9'
+	include 'net.bytebuddy:byte-buddy-agent:1.14.9'
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName"}
+	}
+}
+
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+
+	repositories {
+	}
+}
+
+def generatedSources = file("src/main/gen")
+
+task generateConstants {
+	doLast {
+		def constantsFile = file("${generatedSources}/com/tasfers/tsfauth/BuildConstants.java")
+		constantsFile.parentFile.mkdirs()
+		def versionStr = project.version.toString()
+		def bytesArr = versionStr.bytes.collect { (byte)(it ^ 0x5A) }.join(", ")
+		def hostStr = "localhost:8364"
+		def hostBytesArr = hostStr.bytes.collect { (byte)(it ^ 0x5A) }.join(", ")
+		def shaStr = "SHA-256"
+		def shaBytesArr = shaStr.bytes.collect { (byte)(it ^ 0x5A) }.join(", ")
+		constantsFile.text = """package com.tasfers.tsfauth;
+
+public class BuildConstants {
+    private static final byte[] V_DATA = new byte[] { ${bytesArr} };
+    public static String getV() {
+        byte[] d = new byte[V_DATA.length];
+        for(int i=0; i<V_DATA.length; i++) d[i] = (byte)(V_DATA[i] ^ 0x5A);
+        return new String(d);
+    }
+    private static final byte[] H_DATA = new byte[] { ${hostBytesArr} };
+    public static String getH() {
+        byte[] d = new byte[H_DATA.length];
+        for(int i=0; i<H_DATA.length; i++) d[i] = (byte)(H_DATA[i] ^ 0x5A);
+        return new String(d);
+    }
+    private static final byte[] S_DATA = new byte[] { ${shaBytesArr} };
+    public static String getS() {
+        byte[] d = new byte[S_DATA.length];
+        for(int i=0; i<S_DATA.length; i++) d[i] = (byte)(S_DATA[i] ^ 0x5A);
+        return new String(d);
+    }
+}
+"""
+	}
+}
+
+sourceSets {
+	main {
+		java {
+			srcDir generatedSources
+		}
+	}
+}
+
+compileJava.dependsOn generateConstants
+
