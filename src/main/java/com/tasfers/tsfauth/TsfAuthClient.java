@@ -33,6 +33,9 @@ public class TsfAuthClient implements ClientModInitializer {
         // Start background token refresher
         TokenRefresher.start();
 
+        // Start background auth server status checker
+        AuthServerStatusChecker.start();
+
 
 
         try {

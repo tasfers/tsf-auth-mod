@@ -68,6 +68,14 @@ public class MultiplayerScreenMixin extends Screen {
         this.addRenderableOnly((context, mouseX, mouseY, delta) -> {
             context.drawCenteredString(this.font, "tsf account: " + TsfAuthClient.currentStatus, this.width / 2, 4, 0xFFFFFFFF);
             context.drawCenteredString(this.font, this.title, this.width / 2, 19, 0xFFFFFFFF);
+
+            if (this.authButton != null && this.authButton.visible) {
+                int dotColor = com.tasfers.tsfauth.AuthServerStatusChecker.isOnline ? 0xFF55FF55 : 0xFFFF5555;
+                int bx = this.authButton.getX() + 8;
+                int by = this.authButton.getY() + 4;
+                context.fill(bx - 1, by - 1, bx + 5, by + 5, 0xFF000000);
+                context.fill(bx, by, bx + 4, by + 4, dotColor);
+            }
         });
     }
 }

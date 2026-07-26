@@ -19,15 +19,24 @@ public class AccountListScreen extends Screen {
     private long lastClickTime = 0;
     private Button loginButton;
     private Button deleteButton;
+    private Button addButton;
+    private Button refreshButton;
+    private Button refreshAllButton;
+    private Button backButton;
     private float modelXRot = -5.0f;
     private float modelYRot = 30.0f;
     private boolean isDraggingModel = false;
+    private Button overlayBackButton;
+    private float reconnectCountdown = 10.0f;
+    private boolean isReconnecting = false;
+    private long lastTickTime = 0;
 
     public AccountListScreen(Screen parent) {
         super(Component.literal("tsf auth"));
         this.parent = parent;
         AccountManager.loadAccounts();
         SkinFetcher.clearCache();
+        AuthServerStatusChecker.triggerCheck();
     }
 
     @Override
@@ -37,9 +46,10 @@ public class AccountListScreen extends Screen {
         }).bounds(this.width / 2 - 165, this.height - 28, 50, 20).build();
         this.addRenderableWidget(this.loginButton);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Add"), button -> {
+        this.addButton = Button.builder(Component.literal("Add"), button -> {
             this.minecraft.setScreen(new AuthScreen(this));
-        }).bounds(this.width / 2 - 110, this.height - 28, 40, 20).build());
+        }).bounds(this.width / 2 - 110, this.height - 28, 40, 20).build();
+        this.addRenderableWidget(this.addButton);
 
         this.deleteButton = Button.builder(Component.literal("Delete"), button -> {
             if (this.selectedUuid != null) {
@@ -49,33 +59,104 @@ public class AccountListScreen extends Screen {
         }).bounds(this.width / 2 - 65, this.height - 28, 50, 20).build();
         this.addRenderableWidget(this.deleteButton);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Refresh"), button -> {
+        this.refreshButton = Button.builder(Component.literal("Refresh"), button -> {
             if (this.selectedUuid != null) {
                 SkinFetcher.clearSkin(this.selectedUuid);
                 new Thread(() -> {
                     AccountManager.validateSession(this.selectedUuid);
                 }).start();
             }
-        }).bounds(this.width / 2 - 10, this.height - 28, 55, 20).build());
+        }).bounds(this.width / 2 - 10, this.height - 28, 55, 20).build();
+        this.addRenderableWidget(this.refreshButton);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Refresh All"), button -> {
+        this.refreshAllButton = Button.builder(Component.literal("Refresh All"), button -> {
             new Thread(() -> {
                 for (AccountManager.Account acc : AccountManager.getAccounts()) {
                     SkinFetcher.clearSkin(acc.uuid);
                     AccountManager.validateSession(acc.uuid);
                 }
             }).start();
-        }).bounds(this.width / 2 + 50, this.height - 28, 70, 20).build());
+        }).bounds(this.width / 2 + 50, this.height - 28, 70, 20).build();
+        this.addRenderableWidget(this.refreshAllButton);
 
-        this.addRenderableWidget(Button.builder(Component.literal("Back"), button -> {
+        this.backButton = Button.builder(Component.literal("Back"), button -> {
             this.minecraft.setScreen(this.parent);
-        }).bounds(this.width / 2 + 125, this.height - 28, 40, 20).build());
+        }).bounds(this.width / 2 + 125, this.height - 28, 40, 20).build();
+        this.addRenderableWidget(this.backButton);
+
+        this.overlayBackButton = Button.builder(Component.literal("Назад"), button -> {
+            this.minecraft.setScreen(this.parent);
+        }).bounds(this.width / 2 - 50, this.height / 2 + 15, 100, 20).build();
+        this.addRenderableWidget(this.overlayBackButton);
 
         // We will render accounts manually and handle clicks in mouseClicked
     }
 
     @Override
     public void render(GuiGraphics context, int mouseX, int mouseY, float delta) {
+        boolean offline = !com.tasfers.tsfauth.AuthServerStatusChecker.isOnline;
+
+        // Toggle widget visibility
+        if (this.loginButton != null) this.loginButton.visible = !offline;
+        if (this.addButton != null) this.addButton.visible = !offline;
+        if (this.deleteButton != null) this.deleteButton.visible = !offline;
+        if (this.refreshButton != null) this.refreshButton.visible = !offline;
+        if (this.refreshAllButton != null) this.refreshAllButton.visible = !offline;
+        if (this.backButton != null) this.backButton.visible = !offline;
+        if (this.overlayBackButton != null) this.overlayBackButton.visible = offline;
+
+        if (offline) {
+            if (this.overlayBackButton != null) this.overlayBackButton.visible = false;
+            super.render(context, mouseX, mouseY, delta);
+            
+            long now = System.currentTimeMillis();
+            if (this.lastTickTime == 0) {
+                this.lastTickTime = now;
+            }
+            float elapsedSeconds = (now - this.lastTickTime) / 1000.0f;
+            this.lastTickTime = now;
+
+            if (!this.isReconnecting) {
+                this.reconnectCountdown -= elapsedSeconds;
+                if (this.reconnectCountdown <= 0.0f) {
+                    this.reconnectCountdown = 0.0f;
+                    this.isReconnecting = true;
+                    com.tasfers.tsfauth.AuthServerStatusChecker.triggerCheck().thenRun(() -> {
+                        this.minecraft.execute(() -> {
+                            this.isReconnecting = false;
+                            this.reconnectCountdown = 10.0f;
+                        });
+                    });
+                }
+            }
+
+            // Draw dark background overlay
+            context.fill(0, 0, this.width, this.height, 0xD0000000);
+
+            // Draw error message
+            context.drawCenteredString(this.font, "§cСервер авторизации недоступен.", this.width / 2, this.height / 2 - 30, 0xFFFFFFFF);
+
+            // Draw status
+            String statusText;
+            if (this.isReconnecting) {
+                statusText = "§eПереподключение...";
+            } else {
+                statusText = String.format("§7Переподключение через %.1f...", this.reconnectCountdown);
+            }
+            context.drawCenteredString(this.font, statusText, this.width / 2, this.height / 2 - 10, 0xFFFFFFFF);
+
+            // Render the back button on top of the overlay
+            if (this.overlayBackButton != null) {
+                this.overlayBackButton.visible = true;
+                this.overlayBackButton.render(context, mouseX, mouseY, delta);
+            }
+            return;
+        } else {
+            this.lastTickTime = 0;
+            this.reconnectCountdown = 10.0f;
+            this.isReconnecting = false;
+        }
+
         super.render(context, mouseX, mouseY, delta);
         context.drawCenteredString(this.font, this.title, this.width / 2, 10, 0xFFFFFFFF);
 
@@ -188,6 +269,9 @@ public class AccountListScreen extends Screen {
         if (super.mouseClicked(event, bl)) {
             return true;
         }
+        if (!com.tasfers.tsfauth.AuthServerStatusChecker.isOnline) {
+            return false;
+        }
         
         int button = event.button();
         double mouseX = event.x();
@@ -291,6 +375,9 @@ public class AccountListScreen extends Screen {
     }
     
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        if (!com.tasfers.tsfauth.AuthServerStatusChecker.isOnline) {
+            return false;
+        }
         this.scrollOffset -= verticalAmount * 20;
         if (this.scrollOffset < 0) this.scrollOffset = 0;
         return true;
