@@ -8,7 +8,8 @@
     "MultiplayerScreenMixin",
     "MinecraftClientAccessor",
     "UserAccessor",
-    "ServerInfoMixin"
+    "ServerInfoMixin",
+    "DisconnectedScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

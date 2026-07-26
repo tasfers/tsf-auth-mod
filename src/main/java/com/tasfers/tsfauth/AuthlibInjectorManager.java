@@ -37,9 +37,9 @@ public class AuthlibInjectorManager {
             String nameOfRunningVM = ManagementFactory.getRuntimeMXBean().getName();
             String pid = nameOfRunningVM.substring(0, nameOfRunningVM.indexOf('@'));
 
-            hostname = hostname.replace("https://", "").replace("http://", "");
-            String protocol = (hostname.contains("localhost") || hostname.contains("127.0.0.1")) ? "http://" : "https://";
-            String apiUrl = protocol + hostname + "/authlib-injector";
+            // Start the local auth proxy server
+            com.tasfers.tsfauth.LocalAuthProxyServer.start();
+            String apiUrl = "http://127.0.0.1:" + com.tasfers.tsfauth.LocalAuthProxyServer.getActivePort() + "/authlib-injector";
 
             LOGGER.info("Using ByteBuddyAgent to dynamically attach authlib-injector to PID " + pid + " for " + apiUrl);
             
