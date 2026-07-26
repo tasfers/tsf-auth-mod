@@ -35,7 +35,6 @@ public class AccountListScreen extends Screen {
         super(Component.literal("tsf auth"));
         this.parent = parent;
         AccountManager.loadAccounts();
-        SkinFetcher.clearCache();
         AuthServerStatusChecker.triggerCheck();
     }
 

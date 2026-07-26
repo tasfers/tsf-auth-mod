@@ -72,7 +72,7 @@ public class MultiplayerScreenMixin extends Screen {
             if (this.authButton != null && this.authButton.visible) {
                 int dotColor = com.tasfers.tsfauth.AuthServerStatusChecker.isOnline ? 0xFF55FF55 : 0xFFFF5555;
                 int bx = this.authButton.getX() + 8;
-                int by = this.authButton.getY() + 4;
+                int by = this.authButton.getY() + 9;
                 context.fill(bx - 1, by - 1, bx + 5, by + 5, 0xFF000000);
                 context.fill(bx, by, bx + 4, by + 4, dotColor);
             }
