@@ -23,7 +23,7 @@ public class TokenRefresher {
 
     public static void start() {
         // Run immediately on startup, then every 30 minutes
-        SCHEDULER.scheduleAtFixedRate(TokenRefresher::refreshTokens, 5, 30 * 60, TimeUnit.SECONDS);
+        SCHEDULER.scheduleWithFixedDelay(TokenRefresher::refreshTokens, 5, 30 * 60, TimeUnit.SECONDS);
     }
 
     private static void refreshTokens() {
