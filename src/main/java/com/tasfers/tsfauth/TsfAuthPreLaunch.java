@@ -16,6 +16,24 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
         if (activeHostname != null && !activeHostname.isEmpty()) {
             return activeHostname;
         }
+
+        // 1. Try local config file override
+        try {
+            java.nio.file.Path configDir = FabricLoader.getInstance().getConfigDir();
+            java.nio.file.Path hostFile = configDir.resolve("tsf_auth_host.txt");
+            if (java.nio.file.Files.exists(hostFile)) {
+                String line = java.nio.file.Files.readString(hostFile).trim();
+                if (!line.isEmpty()) {
+                    activeHostname = line.replace("https://", "").replace("http://", "");
+                    LOGGER.info("Using local override auth host: " + activeHostname);
+                    return activeHostname;
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.error("Failed to read local auth host override", e);
+        }
+
+        // 2. Try fetching from remote GitHub repository
         try {
             java.net.URL url = new java.net.URL("https://raw.githubusercontent.com/tasfers/files/refs/heads/main/tsf_auth_host");
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
@@ -36,7 +54,10 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
         } catch (Exception e) {
             LOGGER.error("Failed to fetch auth host from remote, using fallback", e);
         }
-        activeHostname = "mc-auth.tsf.sh";
+
+        // 3. Fallback to BuildConstants compiled host
+        activeHostname = BuildConstants.getH();
+        LOGGER.info("Using compiled fallback auth host: " + activeHostname);
         return activeHostname;
     }
 

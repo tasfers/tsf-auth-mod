@@ -116,7 +116,7 @@ public class SkinFetcher {
 
     private static void fetchSkin(String uuidStr) {
         try {
-            String hostname = com.tasfers.tsfauth.BuildConstants.getH();
+            String hostname = com.tasfers.tsfauth.TsfAuthPreLaunch.getAuthHost();
             String formattedUuid = uuidStr.replace("-", "");
             String bypassHost = hostname;
             if (hostname.contains("localhost")) {
