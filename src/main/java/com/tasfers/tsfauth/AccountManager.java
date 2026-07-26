@@ -221,6 +221,8 @@ public class AccountManager {
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Content-Type", "application/json");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
             conn.setDoOutput(true);
 
             JsonObject body = new JsonObject();
@@ -235,10 +237,12 @@ public class AccountManager {
             }
 
             int code = conn.getResponseCode();
-            acc.isValid = (code >= 200 && code < 300);
+            if (code < 500) {
+                acc.isValid = (code >= 200 && code < 300);
+            }
         } catch (Exception e) {
-            LOGGER.error("Failed to validate session for " + acc.username, e);
-            acc.isValid = false;
+            LOGGER.error("Failed to validate session for " + acc.username + " (network error)", e);
+            // Keep acc.isValid as-is during temporary connection loss
         } finally {
             acc.isRefreshing = false;
         }

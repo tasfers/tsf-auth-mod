@@ -178,27 +178,31 @@ public class AuthScreen extends Screen {
                         this.statusMessage = "§aSuccess! §cRESTART GAME FOR MULTIPLAYER";
                     }
                 } else {
-                    String body = response.body();
-                    String errorMessage = "Unknown error";
-                    try {
-                        JsonObject json = JsonParser.parseString(body).getAsJsonObject();
-                        if (json.has("errorMessage")) {
-                            errorMessage = json.get("errorMessage").getAsString();
-                        } else if (json.has("message")) {
-                            errorMessage = json.get("message").getAsString();
-                        } else if (json.has("error")) {
-                            errorMessage = json.get("error").getAsString();
+                    if (response.statusCode() >= 500) {
+                        this.statusMessage = "§cAuthentication servers are down. Please try again later.";
+                    } else {
+                        String body = response.body();
+                        String errorMessage = "Unknown error";
+                        try {
+                            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+                            if (json.has("errorMessage")) {
+                                errorMessage = json.get("errorMessage").getAsString();
+                            } else if (json.has("message")) {
+                                errorMessage = json.get("message").getAsString();
+                            } else if (json.has("error")) {
+                                errorMessage = json.get("error").getAsString();
+                            }
+                        } catch (Exception parseEx) {
+                            errorMessage = body != null ? body.trim() : "Unknown error";
+                            if (errorMessage.length() > 100) {
+                                errorMessage = errorMessage.substring(0, 97) + "...";
+                            }
                         }
-                    } catch (Exception parseEx) {
-                        errorMessage = body != null ? body.trim() : "Unknown error";
-                        if (errorMessage.length() > 100) {
-                            errorMessage = errorMessage.substring(0, 97) + "...";
-                        }
+                        this.statusMessage = "§cLogin failed: " + errorMessage;
                     }
-                    this.statusMessage = "§cLogin failed: " + errorMessage;
                 }
             } catch (Exception e) {
-                this.statusMessage = "§cLogin error: " + e.getMessage();
+                this.statusMessage = "§cAuthentication servers are down. Please try again later.";
                 e.printStackTrace();
             }
         });
