@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.util.concurrent.Executors;
 
 public class LocalAuthProxyServer {
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("tsf-auth-proxy");
     private static HttpServer server;
     private static int activePort = 52495;
 
@@ -136,9 +137,11 @@ public class LocalAuthProxyServer {
                 }
 
                 exchange.getRequestHeaders().forEach((name, values) -> {
-                    if (!name.equalsIgnoreCase("Host") && !name.equalsIgnoreCase("Content-Length")) {
-                        for (String val : values) {
+                    for (String val : values) {
+                        try {
                             reqBuilder.header(name, val);
+                        } catch (IllegalArgumentException ignored) {
+                            // Ignore Java HttpClient restricted headers
                         }
                     }
                 });
@@ -165,6 +168,7 @@ public class LocalAuthProxyServer {
                 }
 
             } catch (Exception e) {
+                LOGGER.error("Proxy error forwarding request to " + remoteUrl, e);
                 serveOfflineError(exchange);
             }
         }
