@@ -36,7 +36,7 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
         } catch (Exception e) {
             LOGGER.error("Failed to fetch auth host from remote, using fallback", e);
         }
-        activeHostname = "mc-auth.tasfers.com";
+        activeHostname = "mc-auth.tsf.sh";
         return activeHostname;
     }
 
