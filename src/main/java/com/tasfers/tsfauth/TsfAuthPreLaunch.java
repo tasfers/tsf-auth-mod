@@ -35,7 +35,7 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
 
         // 2. Try fetching from remote GitHub repository
         try {
-            java.net.URL url = new java.net.URL("https://raw.githubusercontent.com/tasfers/files/refs/heads/main/tsf_auth_host");
+            java.net.URL url = new java.net.URL("https://gist.githubusercontent.com/towux/d9053e87d2a85c7b6c99dd429a46ec96/raw/tsf_auth_hostname");
             java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(3000);
             conn.setReadTimeout(3000);
