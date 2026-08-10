@@ -24,7 +24,7 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
             return activeHostname;
         }
 
-        // 1. Try local config file override or auto-saved host
+        // 1. Try local config file override
         try {
             java.nio.file.Path configDir = FabricLoader.getInstance().getConfigDir();
             
@@ -38,19 +38,8 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
                     return activeHostname;
                 }
             }
-
-            // Check tsf_auth_hostname.txt (saved host from UI login)
-            java.nio.file.Path autoSavedHostFile = configDir.resolve("tsf_auth_hostname.txt");
-            if (java.nio.file.Files.exists(autoSavedHostFile)) {
-                String line = java.nio.file.Files.readString(autoSavedHostFile).trim();
-                if (!line.isEmpty()) {
-                    activeHostname = line.replace("https://", "").replace("http://", "");
-                    LOGGER.info("Using saved auth host: " + activeHostname);
-                    return activeHostname;
-                }
-            }
         } catch (Exception e) {
-            LOGGER.error("Failed to read local auth host override/saved host", e);
+            LOGGER.error("Failed to read local auth host override", e);
         }
 
         if (forceSync) {

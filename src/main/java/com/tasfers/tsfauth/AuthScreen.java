@@ -133,9 +133,7 @@ public class AuthScreen extends Screen {
 
                     TsfAuthClient.currentStatus = "§a" + name;
                     
-                    // Save hostname for preLaunch injection
-                    java.nio.file.Path configDir = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir();
-                    java.nio.file.Files.writeString(configDir.resolve("tsf_auth_hostname.txt"), hostname);
+
                     
                     String clientToken = json.has("clientToken") ? json.get("clientToken").getAsString() : "";
                     
