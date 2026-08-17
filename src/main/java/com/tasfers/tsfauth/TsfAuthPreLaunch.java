@@ -10,99 +10,64 @@ import java.nio.file.Path;
 
 public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
     private static final Logger LOGGER = LoggerFactory.getLogger("TsfAuth-prelaunch");
-    public static String activeHostname = "";
-    private static boolean isFetching = false;
-    private static long lastFetchTime = 0;
-    private static final long RETRY_INTERVAL_MS = 30000; // 30 seconds
+    public static volatile String activeHostname = "";
+    private static volatile String lastEtag = "";
+    private static volatile long lastFetchTime = 0;
+    private static volatile boolean isFetching = false;
+    private static final long COOLDOWN_MS = 15_000;
+    private static final long AUTO_REFRESH_INTERVAL_MS = 60_000;
+    private static final String REMOTE_HOST_URL = "https://gist.githubusercontent.com/towux/d9053e87d2a85c7b6c99dd429a46ec96/raw/tsf_auth_hostname";
+
+    private static final java.util.concurrent.ScheduledExecutorService REFRESH_SCHEDULER = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "TsfAuth-HostRefresher");
+        t.setDaemon(true);
+        return t;
+    });
+
+    static {
+        REFRESH_SCHEDULER.scheduleWithFixedDelay(() -> triggerAsyncFetch(false), 60, 60, java.util.concurrent.TimeUnit.SECONDS);
+    }
 
     public static String getAuthHost() {
         return getAuthHost(false);
     }
 
     public static String getAuthHost(boolean forceSync) {
-        if (activeHostname != null && !activeHostname.isEmpty()) {
-            return activeHostname;
-        }
-
-        // 1. Try local config file override
         try {
             java.nio.file.Path configDir = FabricLoader.getInstance().getConfigDir();
-            
-            // Check tsf_auth_host.txt (manual override)
             java.nio.file.Path hostFile = configDir.resolve("tsf_auth_host.txt");
-            if (java.nio.file.Files.exists(hostFile)) {
-                String line = java.nio.file.Files.readString(hostFile).trim();
+            if (Files.exists(hostFile)) {
+                String line = Files.readString(hostFile).trim();
                 if (!line.isEmpty()) {
-                    activeHostname = line.replace("https://", "").replace("http://", "");
-                    LOGGER.info("Using local override auth host: " + activeHostname);
-                    return activeHostname;
+                    String override = line.replace("https://", "").replace("http://", "");
+                    activeHostname = override;
+                    return override;
                 }
             }
         } catch (Exception e) {
             LOGGER.error("Failed to read local auth host override", e);
         }
 
-        if (forceSync) {
-            try {
-                LOGGER.info("Attempting synchronous fetch of active auth host from remote...");
-                java.net.URL url = new java.net.URL("https://gist.githubusercontent.com/towux/d9053e87d2a85c7b6c99dd429a46ec96/raw/tsf_auth_hostname");
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
-                conn.setRequestMethod("GET");
-                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                    String line = reader.readLine();
-                    if (line != null) {
-                        line = line.trim();
-                        if (!line.isEmpty()) {
-                            activeHostname = line.replace("https://", "").replace("http://", "");
-                            LOGGER.info("Fetched active auth host from remote: " + activeHostname);
-                            return activeHostname;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                LOGGER.error("Failed to fetch auth host from remote, using fallback: " + e.getMessage());
-            }
-        } else {
-            triggerAsyncFetch();
+        if (forceSync || activeHostname.isEmpty()) {
+            fetchRemoteHost(true);
+        } else if (System.currentTimeMillis() - lastFetchTime > AUTO_REFRESH_INTERVAL_MS) {
+            triggerAsyncFetch(false);
         }
 
-        // Fallback to BuildConstants compiled host but do NOT cache it in activeHostname permanently
-        return BuildConstants.getH();
+        return activeHostname.isEmpty() ? BuildConstants.getH() : activeHostname;
     }
 
-    private static synchronized void triggerAsyncFetch() {
-        if (isFetching) {
-            return;
-        }
+    public static synchronized void triggerAsyncFetch(boolean force) {
+        if (isFetching) return;
         long now = System.currentTimeMillis();
-        if (now - lastFetchTime < RETRY_INTERVAL_MS) {
+        if (!force && (now - lastFetchTime < COOLDOWN_MS)) {
             return;
         }
         isFetching = true;
-        lastFetchTime = now;
 
         Thread fetchThread = new Thread(() -> {
             try {
-                LOGGER.info("Attempting to fetch active auth host from remote...");
-                java.net.URL url = new java.net.URL("https://gist.githubusercontent.com/towux/d9053e87d2a85c7b6c99dd429a46ec96/raw/tsf_auth_hostname");
-                java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(3000);
-                conn.setReadTimeout(3000);
-                conn.setRequestMethod("GET");
-                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
-                    String line = reader.readLine();
-                    if (line != null) {
-                        line = line.trim();
-                        if (!line.isEmpty()) {
-                            activeHostname = line.replace("https://", "").replace("http://", "");
-                            LOGGER.info("Successfully fetched active auth host from remote: " + activeHostname);
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                LOGGER.error("Failed to fetch auth host from remote: " + e.getMessage());
+                fetchRemoteHost(false);
             } finally {
                 synchronized (TsfAuthPreLaunch.class) {
                     isFetching = false;
@@ -111,6 +76,60 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
         }, "TsfAuth-HostFetcher");
         fetchThread.setDaemon(true);
         fetchThread.start();
+    }
+
+    public static void forceRefresh() {
+        triggerAsyncFetch(true);
+    }
+
+    public static String fetchRemoteHost(boolean synchronous) {
+        try {
+            java.net.URL url = new java.net.URI(REMOTE_HOST_URL).toURL();
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "TsfAuth/2.3.0 (Minecraft Client)");
+            if (lastEtag != null && !lastEtag.isEmpty()) {
+                conn.setRequestProperty("If-None-Match", lastEtag);
+            }
+
+            int responseCode = conn.getResponseCode();
+            lastFetchTime = System.currentTimeMillis();
+
+            if (responseCode == 304) {
+                return activeHostname;
+            }
+
+            if (responseCode == 200) {
+                String etag = conn.getHeaderField("ETag");
+                if (etag != null) {
+                    lastEtag = etag;
+                }
+
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(conn.getInputStream(), java.nio.charset.StandardCharsets.UTF_8))) {
+                    String line = reader.readLine();
+                    if (line != null) {
+                        line = line.trim();
+                        if (!line.isEmpty()) {
+                            String newHost = line.replace("https://", "").replace("http://", "");
+                            if (!newHost.equals(activeHostname)) {
+                                LOGGER.info("Active auth host updated: " + (activeHostname.isEmpty() ? "<none>" : activeHostname) + " -> " + newHost);
+                                activeHostname = newHost;
+                            }
+                            return activeHostname;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            if (synchronous) {
+                LOGGER.error("Failed to fetch auth host from remote synchronously: " + e.getMessage());
+            } else {
+                LOGGER.debug("Async auth host fetch error: " + e.getMessage());
+            }
+        }
+        return activeHostname;
     }
 
     @Override

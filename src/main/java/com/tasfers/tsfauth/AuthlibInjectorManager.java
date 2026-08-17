@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -23,13 +22,16 @@ public class AuthlibInjectorManager {
             Path configDir = FabricLoader.getInstance().getConfigDir();
             Path injectorFile = configDir.resolve("authlib-injector.jar");
 
-            String downloadUrl = "https://authlib-injector.yushi.moe/artifact/55/authlib-injector-1.2.7.jar";
             if (!Files.exists(injectorFile) || Files.size(injectorFile) < 10000) {
-                LOGGER.info("Downloading authlib-injector from " + downloadUrl);
-                try (InputStream in = new URI(downloadUrl).toURL().openStream()) {
+                LOGGER.info("Extracting embedded authlib-injector.jar from mod resources...");
+                try (InputStream in = AuthlibInjectorManager.class.getResourceAsStream("/assets/tsfauth/authlib-injector.jar")) {
+                    if (in == null) {
+                        LOGGER.error("Embedded authlib-injector.jar not found in mod resources!");
+                        return false;
+                    }
                     Files.copy(in, injectorFile, StandardCopyOption.REPLACE_EXISTING);
                 } catch (Exception e) {
-                    LOGGER.error("Failed to download authlib-injector", e);
+                    LOGGER.error("Failed to extract embedded authlib-injector.jar", e);
                     return false;
                 }
             }

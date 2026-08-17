@@ -114,13 +114,25 @@ public class LocalAuthProxyServer {
         }
 
         private void forwardRequest(HttpExchange exchange) throws IOException {
+            byte[] requestBodyBytes = exchange.getRequestBody().readAllBytes();
+            boolean success = tryForward(exchange, requestBodyBytes, false);
+            if (!success) {
+                // If failed, immediately refresh host from remote and retry once
+                String oldHost = TsfAuthPreLaunch.activeHostname;
+                String refreshedHost = TsfAuthPreLaunch.fetchRemoteHost(true);
+                boolean retried = tryForward(exchange, requestBodyBytes, true);
+                if (!retried) {
+                    serveOfflineError(exchange);
+                }
+            }
+        }
+
+        private boolean tryForward(HttpExchange exchange, byte[] requestBodyBytes, boolean isRetry) {
             String host = TsfAuthPreLaunch.getAuthHost();
             String protocol = (host.contains("localhost") || host.contains("127.0.0.1")) ? "http://" : "https://";
             String remoteUrl = protocol + host + exchange.getRequestURI().toString();
 
             try {
-                byte[] requestBodyBytes = exchange.getRequestBody().readAllBytes();
-
                 HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
                         .uri(URI.create(remoteUrl))
                         .timeout(Duration.ofSeconds(4));
@@ -150,8 +162,7 @@ public class LocalAuthProxyServer {
                 int status = resp.statusCode();
 
                 if (status >= 500) {
-                    serveOfflineError(exchange);
-                    return;
+                    return false;
                 }
 
                 resp.headers().map().forEach((name, values) -> {
@@ -166,10 +177,13 @@ public class LocalAuthProxyServer {
                 try (OutputStream os = exchange.getResponseBody()) {
                     os.write(resp.body());
                 }
+                return true;
 
             } catch (Exception e) {
-                LOGGER.error("Proxy error forwarding request to " + remoteUrl, e);
-                serveOfflineError(exchange);
+                if (isRetry) {
+                    LOGGER.error("Proxy error forwarding request on retry to " + remoteUrl, e);
+                }
+                return false;
             }
         }
 
