@@ -59,7 +59,11 @@ public class AuthServerStatusChecker {
             int code = response.statusCode();
             // Server error 5xx or CF 501 means offline
             isOnline = (code >= 200 && code < 500);
-            if (!isOnline) {
+            if (isOnline) {
+                if (!LocalAuthProxyServer.hasFreshMetadata()) {
+                    LocalAuthProxyServer.refreshMetadata();
+                }
+            } else {
                 TsfAuthPreLaunch.triggerAsyncFetch(false);
             }
         } catch (Exception e) {
