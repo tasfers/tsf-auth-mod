@@ -52,29 +52,25 @@ public class AuthlibInjectorManager {
                     : existingIgnored + ",com.tasfers.tsfauth,ru.vidtu.ias";
             System.setProperty("authlibinjector.ignoredPackages", newIgnored);
 
-            // On Linux/Flatpak, self-attaching can cause ByteBuddy to hang waiting for socket response
-            // even though the agent loads successfully. We run it in a daemon thread.
+            final boolean[] success = new boolean[]{false};
             Thread attachThread = new Thread(() -> {
                 try {
                     ByteBuddyAgent.attach(injectorFile.toFile(), pid, apiUrl);
                     LOGGER.info("Successfully attached authlib-injector using ByteBuddyAgent!");
+                    success[0] = true;
                 } catch (Exception e) {
-                    LOGGER.error("Background attach threw an exception", e);
+                    LOGGER.error("Attach threw an exception", e);
                 }
-            });
+            }, "TsfAuth-ByteBuddyAttach");
             attachThread.setDaemon(true);
             attachThread.start();
-            
-            // Unconditionally pause the main thread for 2.5 seconds.
-            // On Windows, attach finishes instantly but authlib-injector still needs time to retransform classes.
-            // If we don't wait, KnotClassLoader starts loading classes concurrently and causes ClassFormatError.
-            // On Linux Flatpak, attach hangs forever, so we just wait 2.5 seconds to give it time to load.
+
             try {
-                Thread.sleep(2500);
+                attachThread.join(20000);
             } catch (InterruptedException ignored) {}
-            
-            injected = true;
-            return true;
+
+            injected = success[0];
+            return success[0];
 
         } catch (Exception e) {
             LOGGER.error("Failed to attach authlib-injector dynamically using ByteBuddy", e);
