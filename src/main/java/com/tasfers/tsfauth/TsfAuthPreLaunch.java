@@ -89,7 +89,7 @@ public class TsfAuthPreLaunch implements PreLaunchEntrypoint {
             conn.setConnectTimeout(3000);
             conn.setReadTimeout(3000);
             conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "TsfAuth/2.3.1 (Minecraft Client)");
+            conn.setRequestProperty("User-Agent", "TsfAuth/2.3.2 (Minecraft Client)");
             if (lastEtag != null && !lastEtag.isEmpty()) {
                 conn.setRequestProperty("If-None-Match", lastEtag);
             }
