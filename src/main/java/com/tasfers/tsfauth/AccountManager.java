@@ -141,6 +141,14 @@ public class AccountManager {
         return null;
     }
 
+    public static Account getAccountByUsername(String username) {
+        if (username == null) return null;
+        for (Account acc : accounts) {
+            if (acc.username.equalsIgnoreCase(username)) return acc;
+        }
+        return null;
+    }
+
     public static List<Account> getAccounts() {
         return accounts;
     }
