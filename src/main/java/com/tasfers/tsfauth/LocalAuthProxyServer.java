@@ -19,23 +19,52 @@ public class LocalAuthProxyServer {
     private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("tsf-auth-proxy");
     private static HttpServer server;
     private static int activePort = 52495;
+    private static final HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(4))
+            .build();
 
-    public static String signaturePublicKey = "-----BEGIN PUBLIC KEY-----\n" +
-            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAiTQWGROyOUUvjEzOaAdp\n" +
-            "VT6DOaW5WweMeKIbsm29Q9sEaDKgwyUdRzU67aTBsZpE8IKVyVEdnyxIqHA9pdN4\n" +
-            "BvAssQVqYuJFsEVsOXgB/F8ESyrenOGkLCGWvT0beXew6RKktGTNTapYsuZwVx0a\n" +
-            "74rGxwAWWUD6bWPH+JfEvNXyStJUNr1rrwjjtlLAqD4zE6e0Y7hc0FOwVoozvmTq\n" +
-            "5u4mCMnFezPxIeVMwt9v0krwDQOm4iwMr6l9YQR/7B59vgrAufGNArXpYgGCJ95a\n" +
-            "uBoJDp/QCFQK+UIDcKzQ0Vg0DqtAxPEJMRCTN/6cSaZ6FHwmvFMNjT3VSq5kPxGL\n" +
-            "jwIDAQAB\n" +
+    private static volatile String cachedMetadataJson = "";
+    public static volatile String signaturePublicKey = "-----BEGIN PUBLIC KEY-----\n" +
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjJ+fwTitSJxKbAEBNQM1\n" +
+            "cwJvybPqnc83m9vELk1qtDgTUk8NmBhCQykL1iYpWA5NuQWgWhcvYc0obuahm3GM\n" +
+            "h5pNkBv0cWHzJZwJwk7d0kxYOdCuPhU5Z/rjFKY28AeKkBsshQw95L0RrKNSMlE6\n" +
+            "Pvn/lUN0ZTxzLMvFm5hdDv/vackyEhDccCWk7OytNLV6BjG2qVumICdUjW/KQhZ/\n" +
+            "eoXspHTjMAIOZZ0LhBAOpYd9IBOGrVUA2AT0MP5chjCP9xTo1/WA8MhXkdiHqzhM\n" +
+            "w2hBvfLp4eugcxESSOaS0jSqaOe8QvncqqhL8dQk9dQhiM4zKkZY3k9/I9g6VqXF\n" +
+            "fQIDAQAB\n" +
             "-----END PUBLIC KEY-----";
+
+    private static final java.nio.file.Path METADATA_FILE = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("tsf_auth_metadata.json");
+    private static volatile boolean isMetadataFresh = false;
 
     public static int getActivePort() {
         return activePort;
     }
 
+    public static boolean hasFreshMetadata() {
+        return isMetadataFresh;
+    }
+
     public static void start() {
         if (server != null) return;
+
+        // Load cached metadata from disk if present
+        try {
+            if (java.nio.file.Files.exists(METADATA_FILE)) {
+                String diskContent = java.nio.file.Files.readString(METADATA_FILE).trim();
+                if (!diskContent.isEmpty()) {
+                    JsonObject json = JsonParser.parseString(diskContent).getAsJsonObject();
+                    if (json.has("signaturePublickey")) {
+                        signaturePublicKey = json.get("signaturePublickey").getAsString();
+                    }
+                    cachedMetadataJson = diskContent;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Fetch fresh metadata from remote server
+        refreshMetadata();
+
         for (int p = 52495; p < 52595; p++) {
             try {
                 server = HttpServer.create(new InetSocketAddress("127.0.0.1", p), 0);
@@ -51,16 +80,45 @@ public class LocalAuthProxyServer {
         }
     }
 
-    static class ProxyHandler implements HttpHandler {
-        private final HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(4))
-                .build();
+    public static synchronized boolean refreshMetadata() {
+        try {
+            String host = TsfAuthPreLaunch.getAuthHost();
+            if (host == null || host.isEmpty()) return false;
+            String protocol = (host.contains("localhost") || host.contains("127.0.0.1")) ? "http://" : "https://";
+            String remoteUrl = protocol + host + "/authlib-injector";
 
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(remoteUrl))
+                    .timeout(Duration.ofSeconds(4))
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+            if (resp.statusCode() == 200 && resp.body() != null && !resp.body().isEmpty()) {
+                String body = resp.body().trim();
+                JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+                if (json.has("signaturePublickey")) {
+                    signaturePublicKey = json.get("signaturePublickey").getAsString();
+                }
+                cachedMetadataJson = body;
+                isMetadataFresh = true;
+                try {
+                    java.nio.file.Files.writeString(METADATA_FILE, body);
+                } catch (Exception ignored) {}
+                LOGGER.info("Successfully fetched and saved auth metadata from " + remoteUrl);
+                return true;
+            }
+        } catch (Exception e) {
+            LOGGER.warn("Failed to fetch remote metadata: " + e.getMessage());
+        }
+        return false;
+    }
+
+    static class ProxyHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             String path = exchange.getRequestURI().getPath();
 
-            if (path.equals("/authlib-injector") || path.equals("/inj") || path.equals("/auth") || path.equals("/authserver")) {
+            if (path.equals("/authlib-injector") || path.equals("/inj") || path.equals("/auth") || path.equals("/authserver") || path.equals("/")) {
                 serveMetadata(exchange);
                 return;
             }
@@ -69,43 +127,31 @@ public class LocalAuthProxyServer {
         }
 
         private void serveMetadata(HttpExchange exchange) throws IOException {
-            try {
+            if (cachedMetadataJson == null || cachedMetadataJson.isEmpty()) {
+                refreshMetadata();
+            }
+
+            String responseBody = cachedMetadataJson;
+            if (responseBody == null || responseBody.isEmpty()) {
                 String host = TsfAuthPreLaunch.getAuthHost();
-                String protocol = (host.contains("localhost") || host.contains("127.0.0.1")) ? "http://" : "https://";
-                String remoteUrl = protocol + host + "/authlib-injector";
+                String domain = host.split(":")[0];
 
-                HttpRequest req = HttpRequest.newBuilder()
-                        .uri(URI.create(remoteUrl))
-                        .timeout(Duration.ofSeconds(3))
-                        .GET()
-                        .build();
-                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
-                if (resp.statusCode() == 200) {
-                    JsonObject json = JsonParser.parseString(resp.body()).getAsJsonObject();
-                    if (json.has("signaturePublickey")) {
-                        signaturePublicKey = json.get("signaturePublickey").getAsString();
-                    }
-                }
-            } catch (Exception ignored) {}
+                responseBody = "{\n" +
+                        "  \"meta\": {\n" +
+                        "    \"serverName\": \"tsf\",\n" +
+                        "    \"implementationName\": \"tsf-yggdrasil-proxy\",\n" +
+                        "    \"implementationVersion\": \"1.0.0\"\n" +
+                        "  },\n" +
+                        "  \"skinDomains\": [\n" +
+                        "    \"" + domain + "\",\n" +
+                        "    \"ibb.co\",\n" +
+                        "    \".ibb.co\"\n" +
+                        "  ],\n" +
+                        "  \"signaturePublickey\": " + new com.google.gson.Gson().toJson(signaturePublicKey) + "\n" +
+                        "}";
+            }
 
-            String host = TsfAuthPreLaunch.getAuthHost();
-            String domain = host.split(":")[0];
-
-            String responseBody = "{\n" +
-                    "  \"meta\": {\n" +
-                    "    \"serverName\": \"tsf\",\n" +
-                    "    \"implementationName\": \"tsf-yggdrasil-proxy\",\n" +
-                    "    \"implementationVersion\": \"1.0.0\"\n" +
-                    "  },\n" +
-                    "  \"skinDomains\": [\n" +
-                    "    \"" + domain + "\",\n" +
-                    "    \"ibb.co\",\n" +
-                    "    \".ibb.co\"\n" +
-                    "  ],\n" +
-                    "  \"signaturePublickey\": " + new com.google.gson.Gson().toJson(signaturePublicKey) + "\n" +
-                    "}";
-
-            byte[] bytes = responseBody.getBytes("UTF-8");
+            byte[] bytes = responseBody.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
             exchange.sendResponseHeaders(200, bytes.length);
             try (OutputStream os = exchange.getResponseBody()) {
@@ -120,6 +166,7 @@ public class LocalAuthProxyServer {
                 // If failed, immediately refresh host from remote and retry once
                 String oldHost = TsfAuthPreLaunch.activeHostname;
                 String refreshedHost = TsfAuthPreLaunch.fetchRemoteHost(true);
+                refreshMetadata();
                 boolean retried = tryForward(exchange, requestBodyBytes, true);
                 if (!retried) {
                     serveOfflineError(exchange);
